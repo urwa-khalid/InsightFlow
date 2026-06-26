@@ -142,7 +142,7 @@ python = "^3.11"
 fastapi = "^0.110.0"
 uvicorn = {extras = ["standard"], version = "^0.29.0"}
 sqlmodel = "^0.0.16"
-asyncpg = "^0.29.0"
+asyncpg = "^0.30.0"
 alembic = "^1.13.1"
 pydantic = {extras = ["email"], version = "^2.6.4"}
 pydantic-settings = "^2.2.1"

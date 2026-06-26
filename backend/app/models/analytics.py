@@ -120,9 +120,9 @@ class AnomalyAlert(SQLModel, table=True):
     alert_id: UUID = Field(default_factory=uuid4, primary_key=True)
     tenant_id: UUID = Field(foreign_key="insightflow_system.tenants.tenant_id", nullable=False)
     target_metric: str = Field(nullable=False, max_length=100)
-    detected_value: float = Field(nullable=False, sa_column=Column(Numeric(15, 4)))
-    expected_value: float = Field(nullable=False, sa_column=Column(Numeric(15, 4)))
-    deviation_percentage: float = Field(nullable=False, sa_column=Column(Numeric(5, 2)))
+    detected_value: float = Field(sa_column=Column(Numeric(15, 4), nullable=False))
+    expected_value: float = Field(sa_column=Column(Numeric(15, 4), nullable=False))
+    deviation_percentage: float = Field(sa_column=Column(Numeric(5, 2), nullable=False))
     status: str = Field(nullable=False, max_length=50) # 'active', 'acknowledged', 'resolved'
     detected_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
     resolved_at: Optional[datetime] = Field(default=None, nullable=True)

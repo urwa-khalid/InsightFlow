@@ -41,7 +41,7 @@ Ensure a `requirements.txt` file exists in `/backend` containing the following p
 fastapi==0.110.0
 uvicorn[standard]==0.29.0
 sqlmodel==0.0.16
-asyncpg==0.29.0
+asyncpg==0.30.0
 alembic==1.13.1
 pydantic[email]==2.6.4
 pydantic-settings==2.2.1

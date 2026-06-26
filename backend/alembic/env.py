@@ -16,7 +16,7 @@ from app.models import Tenant, User, DataSource, SemanticMetric, SemanticTable #
 config = context.config
 
 # Overwrite sqlalchemy.url dynamically using settings config database URL
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://"))
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -70,7 +70,7 @@ async def run_migrations_online() -> None:
 
     """
     connectable = async_engine_from_config(
-        config.get_section(config.config_main_option, {}),
+        config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

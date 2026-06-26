@@ -2,11 +2,16 @@ import operator
 from typing import List, Dict, Any, Annotated, Optional
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
-from langchain_community.chat_models import ChatOllama
+from langchain_ollama import ChatOllama
+
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import BaseMessage
 from langgraph.graph import StateGraph, END
 from app.core.config import settings
+from uuid import UUID
+from sqlmodel import select
+from sqlalchemy import text
+from app.core.database import AsyncSessionLocal
 
 # 1. State Model Definition (Extended with Scenario & Executive variables)
 class AgentTeamState(TypedDict):
@@ -95,13 +100,38 @@ class SQLAgentOutput(BaseModel):
     explanation: str = Field(description="Brief explanation of columns selected.")
 
 async def sql_agent_node(state: AgentTeamState) -> Dict[str, Any]:
-    system_prompt = (
-        "You are the SQL Generation Agent. Write a secure, read-only SELECT SQL statement.\n"
-        "Forbid destructive actions (UPDATE, DELETE, INSERT, DROP, ALTER).\n"
+    active_source_id = state.get("active_source_id")
+    
+    # Default schema configuration
+    schema_prompt = (
         "Database Engine: PostgreSQL. Schema: client_analytics.\n"
         "Tables:\n"
         "- fact_sales (sale_date, amount, country, product_id)\n"
         "- dim_products (product_id, category, margins)\n"
+    )
+    
+    # If a specific active datasource is selected, retrieve its dynamic schema definitions
+    if active_source_id and active_source_id != "default_operational_postgres":
+        from app.models.datasource import SemanticTable
+        async with AsyncSessionLocal() as session:
+            try:
+                source_uuid = UUID(active_source_id)
+                stmt = select(SemanticTable).where(SemanticTable.source_id == source_uuid)
+                res = await session.execute(stmt)
+                tables = res.scalars().all()
+                if tables:
+                    schema_prompt = "Database Engine: PostgreSQL. Schema: insightflow_system.\nTables:\n"
+                    for t in tables:
+                        col_names = list(t.column_definitions.keys())
+                        cols_str = ", ".join([f'"{name}"' for name in col_names])
+                        schema_prompt += f"- {t.table_name} ({cols_str})\n"
+            except Exception:
+                pass
+
+    system_prompt = (
+        "You are the SQL Generation Agent. Write a secure, read-only SELECT SQL statement.\n"
+        "Forbid destructive actions (UPDATE, DELETE, INSERT, DROP, ALTER).\n"
+        f"{schema_prompt}"
     )
     
     prompt = ChatPromptTemplate.from_messages([
@@ -112,11 +142,24 @@ async def sql_agent_node(state: AgentTeamState) -> Dict[str, Any]:
     chain = prompt | llm.with_structured_output(SQLAgentOutput)
     response = await chain.ainvoke({"user_query": state["user_query"]})
     
+    # Execute the generated SQL query against the database to fetch raw dataset
+    dataset = []
+    error_msg = None
+    async with AsyncSessionLocal() as session:
+        try:
+            result = await session.execute(text(response.query_sql))
+            for row in result.mappings():
+                dataset.append(dict(row))
+        except Exception as e:
+            error_msg = str(e)
+            
     return {
         "generated_sql": response.query_sql,
+        "raw_dataset": dataset,
+        "sql_execution_error": error_msg,
         "agent_logs": [{
             "node": "sql_agent_node",
-            "message": f"Successfully compiled SQL query logic: {response.explanation}"
+            "message": f"Successfully compiled SQL query logic. Row count fetched: {len(dataset)}"
         }]
     }
 

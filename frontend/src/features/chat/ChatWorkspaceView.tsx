@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
+  AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from "recharts";
 import { 
   Send, Database, Sparkles, Terminal, Copy, Check, Play,
@@ -58,6 +58,13 @@ export const ChatWorkspaceView: React.FC = () => {
   const [activeNode, setActiveNode] = useState<string | null>(null);
   const [telemetryLogs, setTelemetryLogs] = useState<AgentLog[]>([]);
   
+  // Custom dataset uploads state
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{source_id: string, name: string}>>([]);
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -77,12 +84,38 @@ export const ChatWorkspaceView: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Simulate LangGraph Agent Team Execution
-  const triggerAgentRun = async (queryText: string) => {
-    setIsStreaming(true);
-    setActiveTab("telemetry");
-    setTelemetryLogs([]);
-    
+  // Handler for uploading CSV/Excel datasets
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/datasets/upload", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer dev_session_active"
+        },
+        body: formData
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to upload dataset.");
+      }
+      const data = await response.json();
+      setUploadedFiles(prev => [...prev, { source_id: data.source_id, name: file.name }]);
+      setSelectedSourceId(data.source_id);
+    } catch (err: any) {
+      setUploadError(err.message || "An error occurred during upload.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Run the simulated run as fallback if the backend is not running or fails
+  const runSimulatedAgent = async (queryText: string) => {
     const logs: AgentLog[] = [];
     const addLog = (level: "INFO" | "DEBUG" | "SUCCESS" | "WARNING", node: string, msg: string) => {
       logs.push({
@@ -130,23 +163,115 @@ export const ChatWorkspaceView: React.FC = () => {
     addLog("INFO", "visualization_agent", "Generating Shadcn / Recharts component layout wrapper...");
     await new Promise((r) => setTimeout(r, 800));
 
-    // Finish Run & Output
-    setActiveNode(null);
-    setIsStreaming(false);
-    setActiveTab("canvas");
-
     // Add assistant response message
     setMessages((prev) => [
       ...prev,
       {
         id: Math.random().toString(),
         sender: "assistant",
-        text: `I have compiled the weekly sales statistics. The data showcases a robust growth trend over the 6-week window, peaking at $31,000 in week 6.`,
+        text: `I have compiled the weekly sales statistics. The data showcases a robust growth trend over the 6-week window, peaking at $31,000 in week 6. (Offline Simulation Mode)`,
         sql: generatedSQL,
         chartData: mockWeeklySales,
         chartConfig: { type: "area", xKey: "name", yKeys: ["sales"] }
       }
     ]);
+  };
+
+  // Trigger LangGraph Agent Team Execution
+  const triggerAgentRun = async (queryText: string) => {
+    setIsStreaming(true);
+    setActiveTab("telemetry");
+    setTelemetryLogs([]);
+    
+    const addLog = (level: "INFO" | "DEBUG" | "SUCCESS" | "WARNING", node: string, msg: string) => {
+      setTelemetryLogs(prev => [...prev, {
+        timestamp: new Date().toLocaleTimeString(),
+        level,
+        node,
+        message: msg
+      }]);
+    };
+
+    addLog("INFO", "supervisor_node", "Contacting InsightFlow backend gateway...");
+    setActiveNode("supervisor");
+
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/query/run", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer dev_session_active"
+        },
+        body: JSON.stringify({
+          query_text: queryText,
+          active_source_id: selectedSourceId
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Agent workflow execution failed.");
+      }
+
+      const data = await response.json();
+
+      // Clear the loading logs and add actual agent logs from the run
+      setTelemetryLogs([]);
+      if (data.agent_logs && Array.isArray(data.agent_logs)) {
+        data.agent_logs.forEach((log: any) => {
+          setTelemetryLogs(prev => [...prev, {
+            timestamp: new Date().toLocaleTimeString(),
+            level: "INFO",
+            node: log.node || "agent",
+            message: log.message || ""
+          }]);
+        });
+      }
+
+      // Add assistant response message
+      let replyText = data.analytical_summary || "Query processed successfully.";
+      if (data.executive_summary) {
+        replyText = data.executive_summary;
+      }
+      
+      let chartData = null;
+      let chartConfig = null;
+      
+      // If we have raw_dataset, let's map it to chartData
+      if (data.raw_dataset && data.raw_dataset.length > 0) {
+        const nameKey = data.visualization_config?.xKey || Object.keys(data.raw_dataset[0])[0];
+        const valKeys = data.visualization_config?.yKeys || [Object.keys(data.raw_dataset[0])[1]];
+        
+        chartData = data.raw_dataset.map((row: any) => {
+          const mappedRow: any = { name: row[nameKey] };
+          valKeys.forEach((k: string) => {
+            mappedRow[k] = parseFloat(row[k]) || row[k];
+          });
+          return mappedRow;
+        });
+        chartConfig = data.visualization_config || { type: "area", xKey: "name", yKeys: [Object.keys(data.raw_dataset[0])[1]] };
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Math.random().toString(),
+          sender: "assistant",
+          text: replyText,
+          sql: data.generated_sql || undefined,
+          chartData: chartData || undefined,
+          chartConfig: chartConfig || undefined
+        }
+      ]);
+
+    } catch (err: any) {
+      addLog("WARNING", "error", `Backend offline or error: ${err.message}. Running simulation...`);
+      await runSimulatedAgent(queryText);
+    } finally {
+      setActiveNode(null);
+      setIsStreaming(false);
+      setActiveTab("canvas");
+    }
   };
 
   const handleSend = () => {
