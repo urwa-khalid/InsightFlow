@@ -2,28 +2,8 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { DashboardView } from "@/features/dashboard/DashboardView";
+import { ChatWorkspaceView } from "@/features/chat/ChatWorkspaceView";
 
-
-const ChatWorkspaceView = () => (
-  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-180px)]">
-    <div className="lg:col-span-5 bg-card border border-border rounded-lg p-6 flex flex-col justify-between">
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold border-b border-border pb-2">AI Conversations</h2>
-        <div className="text-sm text-muted-foreground italic">No message logs started. Type a question below to analyze your data...</div>
-      </div>
-      <div className="mt-4">
-        <input 
-          type="text" 
-          placeholder="Ask a question about your business data..." 
-          className="w-full bg-input border border-border rounded-md px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-      </div>
-    </div>
-    <div className="lg:col-span-7 bg-card/45 border border-border rounded-lg flex items-center justify-center text-muted-foreground">
-      Data Execution View Workspace Canvas
-    </div>
-  </div>
-);
 
 const CatalogView = () => (
   <div className="space-y-6">
