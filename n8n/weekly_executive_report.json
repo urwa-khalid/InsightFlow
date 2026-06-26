@@ -1,0 +1,92 @@
+{
+  "name": "Weekly Executive Report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "trigger_weekly",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        180,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/query/report/weekly",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer token-value"
+            }
+          ]
+        }
+      },
+      "id": "fetch_report_data",
+      "name": "HTTP Fetch Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        400,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "executives@acme.com",
+        "subject": "InsightFlow Weekly Executive Performance Digest",
+        "emailType": "html",
+        "html": "=<h2>Weekly Business Intelligence Report</h2><p>{{ $json.report_summary }}</p>",
+        "options": {}
+      },
+      "id": "send_email",
+      "name": "Email Report",
+      "type": "n8n-nodes-base.email",
+      "typeVersion": 1.0,
+      "position": [
+        620,
+        280
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Fetch Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Fetch Report": {
+      "main": [
+        [
+          {
+            "node": "Email Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "versionId": "1.0.0"
+}
