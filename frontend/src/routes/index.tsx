@@ -1,35 +1,8 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
+import { DashboardView } from "@/features/dashboard/DashboardView";
 
-// Simple premium mock views representing sections
-const DashboardView = () => (
-  <div className="space-y-6">
-    <div className="flex justify-between items-center">
-      <h1 className="text-3xl font-semibold tracking-tight">Overview</h1>
-      <div className="text-sm text-muted-foreground bg-card px-3 py-1.5 rounded-md border border-border">
-        Last 30 Days
-      </div>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {["Total Revenue", "Active Customers", "Conversion Rate"].map((title, i) => (
-        <div key={i} className="p-6 bg-card border border-border rounded-lg relative overflow-hidden group hover:border-primary/50 transition-all duration-300">
-          <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-primary/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="text-3xl font-semibold tracking-tight mt-2">
-            {i === 0 ? "$1,284,500" : i === 1 ? "12,450" : "3.42%"}
-          </p>
-          <p className="text-xs text-secondary mt-1 font-medium">
-            {i === 2 ? "-0.12% vs last month" : "+12.4% vs last month"}
-          </p>
-        </div>
-      ))}
-    </div>
-    <div className="h-[300px] bg-card/50 border border-border rounded-lg flex items-center justify-center text-muted-foreground">
-      Interactive Recharts Visualization Placeholder
-    </div>
-  </div>
-);
 
 const ChatWorkspaceView = () => (
   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-180px)]">
